@@ -395,16 +395,59 @@ def text_only_device_map(device: Any, audio: bool = False) -> Any:
     return dm
 
 
+ROCM_FLASH_MAX_HEAD = 256
+ROCM_ATTENTION_CHUNK = 16
+
+
 def rocm_attention_without_flash() -> bool:
-    """On ROCm, turn off torch's flash scaled-dot-product attention, leaving the math kernel. In torch 2.14.1+rocm7.2
-    the flash kernel returns NaN for a head of 512 (Gemma 4's global layers; heads of 128 and 256 agree with the math
-    kernel to bf16) instead of refusing the shape, so every global layer writes NaN and the answers are word salad. The
-    memory-efficient kernel has no ROCm build for these shapes either. Returns whether it changed anything (False on
-    CUDA, where nothing is touched)."""
+    """On ROCm, two changes to scaled-dot-product attention, both made by wrapping
+    torch.nn.functional.scaled_dot_product_attention once (transformers looks it up at each call):
+
+    - a head wider than ROCM_FLASH_MAX_HEAD goes to torch's math kernel. In torch 2.14.1+rocm7.2 the flash kernel
+      returns NaN for a head of 512 (Gemma 4's global layers; heads of 128 and 256 agree with the math kernel to bf16)
+      instead of refusing the shape, so every global layer wrote NaN and the answers were word salad;
+    - a batch of more than ROCM_ATTENTION_CHUNK answers is attended ROCM_ATTENTION_CHUNK at a time, the answers being
+      independent there. The math kernel holds each call's key and value expanded to every query head and the whole
+      score matrix, and ROCm's flash kernel a workspace of its own; whole, a batch of 64 left the 7900 XTX with about
+      100 MiB to spare and its writer's floor ran out of memory.
+
+    Returns whether it changed anything (False on CUDA, where nothing is touched)."""
     if not getattr(torch.version, "hip", None):
         return False
-    torch.backends.cuda.enable_flash_sdp(False)
-    torch.backends.cuda.enable_mem_efficient_sdp(False)
+    import torch.nn.functional as F
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+
+    if getattr(F.scaled_dot_product_attention, "_rocm_attention", False):
+        return True
+    inner = F.scaled_dot_product_attention
+
+    def one(query, key, value, attn_mask, kwargs):
+        if query.shape[-1] > ROCM_FLASH_MAX_HEAD:
+            with sdpa_kernel(SDPBackend.MATH):
+                return inner(query, key, value, attn_mask=attn_mask, **kwargs)
+        return inner(query, key, value, attn_mask=attn_mask, **kwargs)
+
+    def scaled_dot_product_attention(query, key, value, attn_mask=None, *args, **kwargs):
+        if args:  # positional dropout_p, is_causal, ...: as torch takes them
+            for name, v in zip(("dropout_p", "is_causal", "scale", "enable_gqa"), args):
+                kwargs[name] = v
+        b = query.shape[0]
+        if query.dim() < 4 or b <= ROCM_ATTENTION_CHUNK:
+            return one(query, key, value, attn_mask, kwargs)
+        outs = []
+        for i in range(0, b, ROCM_ATTENTION_CHUNK):
+            j = min(b, i + ROCM_ATTENTION_CHUNK)
+            m = attn_mask
+            if m is not None and m.dim() == 4 and m.shape[0] == b:
+                m = m[i:j]
+            k = key[i:j] if key.shape[0] == b else key
+            v = value[i:j] if value.shape[0] == b else value
+            outs.append(one(query[i:j], k, v, m, kwargs))
+        return torch.cat(outs, dim=0)
+
+    scaled_dot_product_attention._rocm_attention = True  # type: ignore[attr-defined]
+    scaled_dot_product_attention.__wrapped__ = inner  # type: ignore[attr-defined]
+    F.scaled_dot_product_attention = scaled_dot_product_attention
     return True
 
 
