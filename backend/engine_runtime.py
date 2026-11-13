@@ -395,6 +395,19 @@ def text_only_device_map(device: Any, audio: bool = False) -> Any:
     return dm
 
 
+def rocm_attention_without_flash() -> bool:
+    """On ROCm, turn off torch's flash scaled-dot-product attention, leaving the math kernel. In torch 2.14.1+rocm7.2
+    the flash kernel returns NaN for a head of 512 (Gemma 4's global layers; heads of 128 and 256 agree with the math
+    kernel to bf16) instead of refusing the shape, so every global layer writes NaN and the answers are word salad. The
+    memory-efficient kernel has no ROCm build for these shapes either. Returns whether it changed anything (False on
+    CUDA, where nothing is touched)."""
+    if not getattr(torch.version, "hip", None):
+        return False
+    torch.backends.cuda.enable_flash_sdp(False)
+    torch.backends.cuda.enable_mem_efficient_sdp(False)
+    return True
+
+
 def settle_text_only_device_map(hf_model: nn.Module, device: Any) -> None:
     """Called after a load by text_only_device_map and before patch_compressed_tensors_for_low_vram (which drops the
     vision tower, leaving every weight on `device`, as a one-device load leaves it): the hooks accelerate set on each
@@ -811,6 +824,7 @@ class TheodoliteRuntime:
         except Exception:
             config = AutoConfig.from_pretrained(self.model_id, trust_remote_code=False)
         device_map = text_only_device_map(self.device, audio=getattr(config, "audio_config", None) is not None)
+        rocm_attention_without_flash()
         try:
             tokenizer = AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=False, local_files_only=True)
             hf_model, loading_info = Gemma4ForConditionalGeneration.from_pretrained(
