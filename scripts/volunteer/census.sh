@@ -108,8 +108,41 @@ claim_field() {  # a field of the layer's claim file ("" when there is none)
     sed -n "s/^$1=//p" "$CLAIM" | head -1
 }
 
-card_name() {  # the card the census will run on: CUDA_VISIBLE_DEVICES's first, else 0
+amd_card() {  # an AMD card through rocm-smi, as "name|total MiB|used MiB": the card ROCR_VISIBLE_DEVICES names by
+    # its GPU-<id> (or, as a number, cardN), else the first with more than 4 GiB (an integrated GPU has less)
+    command -v rocm-smi >/dev/null || return 1
+    rocm-smi --showproductname --showmeminfo vram --showuniqueid --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    cards = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+want = (sys.argv[1].split(",")[0] if len(sys.argv) > 1 else "").strip()
+def mib(c, k):
+    return int(int(c.get(k, 0)) / 1048576)
+pick = None
+for key, c in cards.items():
+    if not key.startswith("card"):
+        continue
+    uid = str(c.get("Unique ID", "")).lower().replace("0x", "")
+    if want.lower().startswith("gpu-") and uid == want[4:].lower():
+        pick = c
+    elif want.isdigit() and key == "card" + want:
+        pick = c
+    elif not want and pick is None and mib(c, "VRAM Total Memory (B)") > 4096:
+        pick = c
+if pick is None:
+    sys.exit(1)
+print("%s|%d|%d" % (pick.get("Card Series", "?"), mib(pick, "VRAM Total Memory (B)"), mib(pick, "VRAM Total Used Memory (B)")))
+' "${ROCR_VISIBLE_DEVICES:-${HIP_VISIBLE_DEVICES:-}}"
+}
+
+card_name() {  # the card the census will run on: CUDA_VISIBLE_DEVICES's first, else 0 (an AMD card: amd_card's)
     if [ "$DRY" = 1 ]; then printf 'CPU stand-in'; return; fi
+    if ! command -v nvidia-smi >/dev/null && amd_card >/dev/null; then
+        amd_card | awk -F'|' '{ printf "%s %d GB", $1, ($2 + 512) / 1024 }'
+        return
+    fi
     local i=${CUDA_VISIBLE_DEVICES:-0}
     i=${i%%,*}
     nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits -i "$i" 2>/dev/null \
@@ -136,8 +169,34 @@ cmd_check() {
     [ "$(uname -s)" = Linux ] && ok "Linux" || hm "this is $(uname -s): the kit is written for Linux (WSL2 untried)"
     if [ "$DRY" = 1 ]; then
         ok "a dry run: the CPU stand-in, no card needed"
+    elif ! command -v nvidia-smi >/dev/null && command -v rocm-smi >/dev/null; then
+        # an AMD card (ROCm): the same size and free-memory bars, read through rocm-smi; a ROCm run is a card class
+        # of its own, judged by the canary's bars like any card other than the home card
+        local card name mem used free pids
+        card=$(amd_card) || card=""
+        IFS='|' read -r name mem used <<<"$card"
+        [ -n "$name" ] || no "rocm-smi names no card (ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES:-unset})"
+        if [ -n "$mem" ] && [ "$mem" -ge "$KIT_MIN_VRAM_MIB" ]; then
+            ok "card: $name, $mem MiB (ROCm)"
+        else
+            no "card: ${name:-?}, ${mem:-?} MiB: the kit needs one card of at least $KIT_MIN_VRAM_MIB MiB"
+        fi
+        free=$(( ${mem:-0} - ${used:-0} ))
+        if [ "$free" -ge "$KIT_MIN_FREE_VRAM_MIB" ]; then
+            ok "card: $free MiB free"
+        else
+            no "card: $free MiB free: a run needs about $KIT_MIN_FREE_VRAM_MIB MiB free on its card: nothing else on it, no display"
+        fi
+        if [ -n "${ROCR_VISIBLE_DEVICES:-}${HIP_VISIBLE_DEVICES:-}" ]; then
+            ok "ROCR_VISIBLE_DEVICES/HIP_VISIBLE_DEVICES pin the run to one card"
+        else
+            hm "no ROCR_VISIBLE_DEVICES: torch numbers every AMD GPU, an integrated one too; pin the card (ROCR_VISIBLE_DEVICES=GPU-<id> from rocminfo)"
+        fi
+        pids=$(rocm-smi --showpids 2>/dev/null | grep -cE '^[0-9]+[[:space:]]' || true)
+        [ "$pids" = 0 ] || hm "$pids process(es) hold the GPU: close them before the canary and the run"
+        hm "ROCm is not the kit's runtime: the venv takes torch from --torch-backend rocm7.2 with the -rocm constraints, and the run is a card class of its own"
     elif ! command -v nvidia-smi >/dev/null; then
-        no "no nvidia-smi: the census needs an NVIDIA card and its driver"
+        no "no nvidia-smi or rocm-smi: the census needs an NVIDIA card (or, untried by the project, an AMD one) and its driver"
     else
         local i=${CUDA_VISIBLE_DEVICES:-0} name mem cuda
         i=${i%%,*}
