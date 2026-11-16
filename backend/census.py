@@ -150,6 +150,8 @@ LAYER_DOSES: Dict[str, Dict[int, Tuple[float, ...]]] = {"match_ceil": MATCH_CEIL
 DESIGNS: Dict[str, List[Tuple[str, float]]] = {
     "main_rel": [(p, d) for p in ("who", "snake", "orange") for d in (-0.7, 0.5, 0.8)] + [("free", 3.0)],
     "calib_rel": [(p, s * d) for p in ("who", "orange", "free") for d in (0.1, 0.25, 0.5, 1.0, 2.0, 4.0) for s in (-1.0, 1.0)],
+    # Tacheometal (eigentactics): calib_rel's ladder made fine where the 12B's text breaks (between 0.5 and 1 of the stream)
+    "calib_fine": [(p, s * d) for p in ("who", "orange", "free") for d in (0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0) for s in (-1.0, 1.0)],
     # the same ladder's purpose in each neuron's own unit (dose_unit "ceiling"): half of the most it can write by itself
     # up to eight times it
     "calib_ceil": [(p, s * d) for p in ("who", "orange", "free") for d in (0.5, 1.0, 2.0, 4.0, 8.0) for s in (-1.0, 1.0)],
@@ -179,7 +181,7 @@ DESIGNS: Dict[str, List[Tuple[str, float]]] = {
 # the design a census takes when none is named, and the one a layer's run is read from first (layer_runs): break_rel,
 # whose doses come from this model's own ladders, since 29 October 2026 (the owner's choice; main_rel before it)
 DEFAULT_DESIGN = "break_rel"
-CALIBRATION_DESIGNS = ("calib_rel", "calib_ceil")
+CALIBRATION_DESIGNS = ("calib_rel", "calib_ceil", "calib_fine")
 
 
 def design_names() -> List[str]:
@@ -212,6 +214,7 @@ DOSES_FROM = {
                 "calib_ceil runs on a few layers first and read them with census_tools.py curves), and one nominal dose is "
                 "a different push at each layer",
     "calib_rel": "a calibration ladder, for finding where effects begin and text breaks on this model",
+    "calib_fine": "calib_rel's ladder in steps of 0.1 from 0.4 to 1 of the stream (Tacheometal, for the 12B)",
     "calib_ceil": "a calibration ladder in each neuron's own write ceiling, for finding where effects begin and text breaks "
                   "on this model",
     # (its layers counted from 1, as the pages and the scientist count them, unlike DOSES_CALIBRATED's)
