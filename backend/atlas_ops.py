@@ -575,14 +575,17 @@ def write_rows(
             # the step's chosen pieces, their log-probabilities and the top k (and, sampled, the chance each was drawn
             # at), read back to the CPU in one transfer rather than a few per row (float64 holds every float32 and
             # every piece id exactly)
-            cols = [nxt[:, None].double(), lsm.gather(-1, nxt[:, None]).double()]
+            # (MPS has no float64: there the columns are read back as float32, which holds every piece id below 2**24
+            # and every float32 log-probability exactly, and widened on the CPU: the same values)
+            wide = torch.float32 if nxt.device.type == "mps" else torch.float64
+            cols = [nxt[:, None].to(wide), lsm.gather(-1, nxt[:, None]).to(wide)]
             k = int(top_k) if top_k else 0
             if k:
                 tv, ti = torch.topk(lsm, k=k, dim=-1)
-                cols += [ti.double(), tv.double()]
+                cols += [ti.to(wide), tv.to(wide)]
             if race is not None:
-                cols.append(drawn_at.double())
-            host = torch.cat(cols, dim=-1).cpu().tolist()
+                cols.append(drawn_at.to(wide))
+            host = torch.cat(cols, dim=-1).cpu().double().tolist()
             if race is not None and any(not done[r] and not host[r][-1] > 0 for r in range(B)):
                 raise ValueError(f"At temperature {float(sampler.temperature):g} the sampler has no chances to draw from (one is "
                                  "not a number, or none is above 0: the logits over so small a temperature can overflow). "

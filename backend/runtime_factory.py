@@ -83,8 +83,8 @@ def runtime_device() -> str:
     d = os.environ.get(DEVICE_ENV, "").strip().lower() or DEFAULT_DEVICE
     if d == "cuda":
         d = "cuda:0"
-    if d != "cpu" and not re.fullmatch(r"cuda:\d+", d):
-        raise ValueError(f"{DEVICE_ENV}={d!r}: the runtime runs on cpu or cuda:N (cuda:0 by default).")
+    if d != "cpu" and d != "mps" and not re.fullmatch(r"cuda:\d+", d):
+        raise ValueError(f"{DEVICE_ENV}={d!r}: the runtime runs on cpu, mps (Apple GPU) or cuda:N (cuda:0 by default).")
     return d
 
 
@@ -107,7 +107,7 @@ def reading_class(device: Any, dtype: Any = None) -> str:
 
     dev = torch.device(device)
     dt = str(dtype if dtype is not None else torch.bfloat16).replace("torch.", "")
-    return "" if dev.type == "cuda" and dt == "bfloat16" else f"@{dev.type}/{dt}"
+    return "" if dev.type in ("cuda", "mps") and dt == "bfloat16" else f"@{dev.type}/{dt}"
 
 
 class CheckpointRuntime(TheodoliteRuntime):

@@ -1849,7 +1849,7 @@ def runtime_record(device: Any = None, act_scale: Optional[Path] = None) -> Dict
     except (OSError, subprocess.SubprocessError):
         pass
     return {
-        "device": torch.cuda.get_device_name(dev) if dev.type == "cuda" else "cpu",
+        "device": torch.cuda.get_device_name(dev) if dev.type == "cuda" else ("mps" if dev.type == "mps" else "cpu"),
         "torch": torch.__version__, "cuda": torch.version.cuda, "transformers": version("transformers"),
         "interp_engine": version("interp-engine"), "compressed_tensors": version("compressed-tensors"),
         "git": sha, "git_clean": clean, "act_scale_sha256": file_sha256(Path(act_scale)) if act_scale else None,
