@@ -89,6 +89,7 @@ class GGUFRuntime(er.TheodoliteRuntime):
 
     def load(self) -> "GGUFRuntime":
         """Build the model from the GGUF, then everything the pinned `load()` does after its model is built."""
+        er.rocm_attention_without_flash()  # ROCm: what the pinned load does first (eigentactics rocm branch)
         t0 = time.perf_counter()
         logger.info("Loading Gemma 4 from the GGUF %s on %s (%s linear layers%s, %s)...", self.gguf_path, self.device,
                     self.linears, "" if self.resident_gb is None else f", resident up to {self.resident_gb} GB",
