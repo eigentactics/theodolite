@@ -140,6 +140,11 @@ DESIGN_HALVES["tach_rel"] = DESIGN_HALVES["break_rel"]
 TACH_REL_06 = 0.6
 DESIGN_QUESTIONS["tach_rel_06"] = DESIGN_QUESTIONS["break_rel"]
 DESIGN_HALVES["tach_rel_06"] = DESIGN_HALVES["break_rel"]
+# Tacheometal v5 (notes/tacheometal/prereg-v5): both doses at or under layer 24's edge, the upper at it and the lower
+# half a doubling under it, as soft_ceil places its pair, in stream units
+TACH_SOFT_06 = (round(0.6 * 0.5 ** 0.5, 6), 0.6)
+DESIGN_QUESTIONS["tach_soft_06"] = DESIGN_QUESTIONS["break_rel"]
+DESIGN_HALVES["tach_soft_06"] = DESIGN_HALVES["break_rel"]
 MATCH_NATS = (1.0, 1.4)
 # the fine pilot of 13 November 2026 (05:24Z; experiments/results/census_scaled_design/fine_pilot.json), layers 30
 # to 38, each pair as `census_dose_pilot.py doses --targets 1.0,1.4` gave it. Layer 45, the pilot's reference, is
@@ -188,6 +193,7 @@ DESIGNS: Dict[str, List[Tuple[str, float]]] = {
     "tach_rel": [(p, s * d) for p in DESIGN_QUESTIONS["tach_rel"] for d in (TACH_REL, 2 * TACH_REL) for s in (-1.0, 1.0)],
     "tach_rel_06": [(p, s * d) for p in DESIGN_QUESTIONS["tach_rel_06"] for d in (TACH_REL_06, 2 * TACH_REL_06)
                     for s in (-1.0, 1.0)],
+    "tach_soft_06": [(p, s * d) for p in DESIGN_QUESTIONS["tach_soft_06"] for d in TACH_SOFT_06 for s in (-1.0, 1.0)],
 }
 # the design a census takes when none is named, and the one a layer's run is read from first (layer_runs): break_rel,
 # whose doses come from this model's own ladders, since 29 October 2026 (the owner's choice; main_rel before it)
@@ -385,6 +391,7 @@ DESIGN_READING: Dict[str, Dict[str, Any]] = {
     "match_ceil": {"max_rel": 100.0, "reference": "controls", "exclude": "own"},  # and so here
     "tach_rel": {"max_rel": 2.5, "reference": "controls", "exclude": "own"},  # as break_rel: every answer counted
     "tach_rel_06": {"max_rel": 2.5, "reference": "controls", "exclude": "own"},
+    "tach_soft_06": {"max_rel": 2.5, "reference": "controls", "exclude": "own"},
 }
 
 
@@ -409,6 +416,7 @@ COLLAPSE_RULE["soft_ceil"] = {"doses": (SOFT_CEIL[1],), "answers": 2, "per_1024"
 COLLAPSE_RULE["match_ceil"] = {"doses": "upper", "answers": 2, "per_1024": 10}
 COLLAPSE_RULE["tach_rel"] = {"doses": (2 * TACH_REL,), "answers": 2, "per_1024": 10}
 COLLAPSE_RULE["tach_rel_06"] = {"doses": (2 * TACH_REL_06,), "answers": 2, "per_1024": 10}
+COLLAPSE_RULE["tach_soft_06"] = {"doses": (TACH_SOFT_06[1],), "answers": 2, "per_1024": 10}
 
 # What a census lead says, wherever one is shown (the owner's choice of 29 October 2026, a question break_rel's
 # pre-registration left open): that the neuron's pushes differ from random ones, not that its words share a theme. Every
@@ -560,7 +568,7 @@ def shown_unit(unit: Dict[str, Any]) -> Dict[str, Any]:
 # the neurons' and one dose is the same share of each neuron's most at every layer. A design whose doses only mean
 # something in one unit names it.
 DOSE_UNITS = ("stream", "ceiling")
-DESIGN_UNITS = {"calib_ceil": "ceiling", "break_rel": "stream", "tach_rel": "stream", "tach_rel_06": "stream", "break_ceil": "ceiling", "soft_ceil": "ceiling",
+DESIGN_UNITS = {"calib_ceil": "ceiling", "break_rel": "stream", "tach_rel": "stream", "tach_rel_06": "stream", "tach_soft_06": "stream", "break_ceil": "ceiling", "soft_ceil": "ceiling",
                 "match_ceil": "ceiling"}
 # 2: controls drawn as unit(w_post * r) (1 was isotropic, ~100x louder to the next layer than any neuron on the 31B)
 CENSUS_VERSION = 2
