@@ -160,6 +160,11 @@ DESIGN_QUESTIONS["tach_things_06"] = ("bicycle", "walk", "chair", "kettle", "sle
                                       "clock", "rice", "vase", "lock", "money", "blanket")
 DESIGN_HALVES["tach_things_06"] = (DESIGN_QUESTIONS["tach_things_06"][:6], DESIGN_QUESTIONS["tach_things_06"][6:])
 CALIB_LOW = (0.25, 0.275, 0.3, 0.325, 0.35, 0.375, 0.4)  # Tacheometal v8's ladder, in stream units
+# Tacheometal v8: layer 16's doses, set by calib_low and prereg-v8's rule (upper the largest rung keeping 0.90 of the
+# distinct 4-grams, lower half a doubling under it), on tach_things_06's questions
+TACH_THINGS_16 = (0.247487, 0.35)
+DESIGN_QUESTIONS["tach_things_16"] = DESIGN_QUESTIONS["tach_things_06"]
+DESIGN_HALVES["tach_things_16"] = DESIGN_HALVES["tach_things_06"]
 DESIGN_QUESTIONS["calib_low"] = DESIGN_QUESTIONS["tach_things_06"]
 MATCH_NATS = (1.0, 1.4)
 # the fine pilot of 13 November 2026 (05:24Z; experiments/results/census_scaled_design/fine_pilot.json), layers 30
@@ -213,6 +218,8 @@ DESIGNS: Dict[str, List[Tuple[str, float]]] = {
     "tach_rel_06": [(p, s * d) for p in DESIGN_QUESTIONS["tach_rel_06"] for d in (TACH_REL_06, 2 * TACH_REL_06)
                     for s in (-1.0, 1.0)],
     "tach_soft_06": [(p, s * d) for p in DESIGN_QUESTIONS["tach_soft_06"] for d in TACH_SOFT_06 for s in (-1.0, 1.0)],
+    "tach_things_16": [(p, s * d) for p in DESIGN_QUESTIONS["tach_things_16"] for d in TACH_THINGS_16
+                       for s in (-1.0, 1.0)],
     "tach_things_06": [(p, s * d) for p in DESIGN_QUESTIONS["tach_things_06"] for d in TACH_SOFT_06
                        for s in (-1.0, 1.0)],
 }
@@ -415,6 +422,7 @@ DESIGN_READING: Dict[str, Dict[str, Any]] = {
     "tach_rel_06": {"max_rel": 2.5, "reference": "controls", "exclude": "own"},
     "tach_soft_06": {"max_rel": 2.5, "reference": "controls", "exclude": "own"},
     "tach_things_06": {"max_rel": 2.5, "reference": "controls", "exclude": "own"},
+    "tach_things_16": {"max_rel": 2.5, "reference": "controls", "exclude": "own"},
 }
 
 
@@ -441,6 +449,7 @@ COLLAPSE_RULE["tach_rel"] = {"doses": (2 * TACH_REL,), "answers": 2, "per_1024":
 COLLAPSE_RULE["tach_rel_06"] = {"doses": (2 * TACH_REL_06,), "answers": 2, "per_1024": 10}
 COLLAPSE_RULE["tach_soft_06"] = {"doses": (TACH_SOFT_06[1],), "answers": 2, "per_1024": 10}
 COLLAPSE_RULE["tach_things_06"] = {"doses": (TACH_SOFT_06[1],), "answers": 2, "per_1024": 10}
+COLLAPSE_RULE["tach_things_16"] = {"doses": (TACH_THINGS_16[1],), "answers": 2, "per_1024": 10}
 
 # What a census lead says, wherever one is shown (the owner's choice of 29 October 2026, a question break_rel's
 # pre-registration left open): that the neuron's pushes differ from random ones, not that its words share a theme. Every
@@ -592,7 +601,7 @@ def shown_unit(unit: Dict[str, Any]) -> Dict[str, Any]:
 # the neurons' and one dose is the same share of each neuron's most at every layer. A design whose doses only mean
 # something in one unit names it.
 DOSE_UNITS = ("stream", "ceiling")
-DESIGN_UNITS = {"calib_ceil": "ceiling", "break_rel": "stream", "tach_rel": "stream", "tach_rel_06": "stream", "tach_soft_06": "stream", "tach_things_06": "stream", "break_ceil": "ceiling", "soft_ceil": "ceiling",
+DESIGN_UNITS = {"calib_ceil": "ceiling", "break_rel": "stream", "tach_rel": "stream", "tach_rel_06": "stream", "tach_soft_06": "stream", "tach_things_06": "stream", "tach_things_16": "stream", "break_ceil": "ceiling", "soft_ceil": "ceiling",
                 "match_ceil": "ceiling"}
 # 2: controls drawn as unit(w_post * r) (1 was isotropic, ~100x louder to the next layer than any neuron on the 31B)
 CENSUS_VERSION = 2
