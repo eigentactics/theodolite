@@ -159,6 +159,7 @@ DESIGN_HALVES["tach_soft_06"] = DESIGN_HALVES["break_rel"]
 DESIGN_QUESTIONS["tach_things_06"] = ("bicycle", "walk", "chair", "kettle", "sleep", "lamp",
                                       "clock", "rice", "vase", "lock", "money", "blanket")
 DESIGN_HALVES["tach_things_06"] = (DESIGN_QUESTIONS["tach_things_06"][:6], DESIGN_QUESTIONS["tach_things_06"][6:])
+CALIB_LOW = (0.25, 0.275, 0.3, 0.325, 0.35, 0.375, 0.4)  # Tacheometal v8's ladder, in stream units
 MATCH_NATS = (1.0, 1.4)
 # the fine pilot of 13 November 2026 (05:24Z; experiments/results/census_scaled_design/fine_pilot.json), layers 30
 # to 38, each pair as `census_dose_pilot.py doses --targets 1.0,1.4` gave it. Layer 45, the pilot's reference, is
@@ -179,6 +180,9 @@ DESIGNS: Dict[str, List[Tuple[str, float]]] = {
     "calib_rel": [(p, s * d) for p in ("who", "orange", "free") for d in (0.1, 0.25, 0.5, 1.0, 2.0, 4.0) for s in (-1.0, 1.0)],
     # Tacheometal (eigentactics): calib_rel's ladder made fine where the 12B's text breaks (between 0.5 and 1 of the stream)
     "calib_fine": [(p, s * d) for p in ("who", "orange", "free") for d in (0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0) for s in (-1.0, 1.0)],
+    # Tacheometal v8 (notes/tacheometal/prereg-v8): under calib_fine's lowest rung, for a layer whose text breaks
+    # there (layer 16), on the twelve questions the trial asks
+    "calib_low": [(p, s * d) for p in DESIGN_QUESTIONS["tach_things_06"] for d in CALIB_LOW for s in (-1.0, 1.0)],
     # the same ladder's purpose in each neuron's own unit (dose_unit "ceiling"): half of the most it can write by itself
     # up to eight times it
     "calib_ceil": [(p, s * d) for p in ("who", "orange", "free") for d in (0.5, 1.0, 2.0, 4.0, 8.0) for s in (-1.0, 1.0)],
@@ -214,7 +218,7 @@ DESIGNS: Dict[str, List[Tuple[str, float]]] = {
 # the design a census takes when none is named, and the one a layer's run is read from first (layer_runs): break_rel,
 # whose doses come from this model's own ladders, since 29 October 2026 (the owner's choice; main_rel before it)
 DEFAULT_DESIGN = "break_rel"
-CALIBRATION_DESIGNS = ("calib_rel", "calib_ceil", "calib_fine")
+CALIBRATION_DESIGNS = ("calib_rel", "calib_ceil", "calib_fine", "calib_low")
 
 
 def design_names() -> List[str]:
@@ -248,6 +252,7 @@ DOSES_FROM = {
                 "a different push at each layer",
     "calib_rel": "a calibration ladder, for finding where effects begin and text breaks on this model",
     "calib_fine": "calib_rel's ladder in steps of 0.1 from 0.4 to 1 of the stream (Tacheometal, for the 12B)",
+    "calib_low": "a ladder from 0.25 to 0.4 of the stream in steps of 0.025 on match_things's twelve questions (Tacheometal v8)",
     "calib_ceil": "a calibration ladder in each neuron's own write ceiling, for finding where effects begin and text breaks "
                   "on this model",
     # (its layers counted from 1, as the pages and the scientist count them, unlike DOSES_CALIBRATED's)
