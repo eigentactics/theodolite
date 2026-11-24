@@ -160,6 +160,7 @@ DESIGN_QUESTIONS["tach_things_06"] = ("bicycle", "walk", "chair", "kettle", "sle
                                       "clock", "rice", "vase", "lock", "money", "blanket")
 DESIGN_HALVES["tach_things_06"] = (DESIGN_QUESTIONS["tach_things_06"][:6], DESIGN_QUESTIONS["tach_things_06"][6:])
 CALIB_LOW = (0.25, 0.275, 0.3, 0.325, 0.35, 0.375, 0.4)  # Tacheometal v8's ladder, in stream units
+DESIGN_QUESTIONS["calib_low"] = DESIGN_QUESTIONS["tach_things_06"]
 MATCH_NATS = (1.0, 1.4)
 # the fine pilot of 13 November 2026 (05:24Z; experiments/results/census_scaled_design/fine_pilot.json), layers 30
 # to 38, each pair as `census_dose_pilot.py doses --targets 1.0,1.4` gave it. Layer 45, the pilot's reference, is
